@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReduceQuality</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ── Header ────────────────────────────── -->
+    <header class="header">
+      <div class="header-logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" fill="url(#lg1)"/>
+          <path d="M2 17l10 5 10-5" stroke="url(#lg2)" stroke-width="2" stroke-linecap="round"/>
+          <path d="M2 12l10 5 10-5" stroke="url(#lg2)" stroke-width="2" stroke-linecap="round"/>
+          <defs>
+            <linearGradient id="lg1" x1="2" y1="7" x2="22" y2="7" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/>
+            </linearGradient>
+            <linearGradient id="lg2" x1="2" y1="12" x2="22" y2="12" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="logo-text">ReduceQuality</span>
+      </div>
+      <span class="version-tag">v1.0</span>
+    </header>
+
+    <!-- ── Toast container ───────────────────── -->
+    <div id="toast-container" aria-live="polite"></div>
+
+    <!-- ── Tab navigation ────────────────────── -->
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="images" id="tab-btn-images" role="tab" aria-selected="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        Images
+      </button>
+      <button class="tab" data-tab="pdf" id="tab-btn-pdf" role="tab" aria-selected="false">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+        PDF
+      </button>
+      <button class="tab" data-tab="settings" id="tab-btn-settings" role="tab" aria-selected="false">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </nav>
+
+    <!-- ══════════════════════════════════════════
+         IMAGES PANEL
+    ══════════════════════════════════════════ -->
+    <div class="panel active" id="panel-images" role="tabpanel">
+
+      <!-- Drop zone -->
+      <div class="drop-zone" id="img-drop" tabindex="0" role="button" aria-label="Drop images here or click to browse">
+        <svg class="drop-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <path d="M21 15l-5-5L5 21"/>
+        </svg>
+        <p class="drop-label">Drop images here</p>
+        <p class="drop-sub">or <button class="inline-btn" id="img-browse-btn" type="button">browse files</button></p>
+        <p class="drop-types">JPG &bull; PNG &bull; WebP</p>
+        <input type="file" id="img-input" multiple accept="image/jpeg,image/jpg,image/png,image/webp" hidden aria-hidden="true" />
+      </div>
+
+      <!-- Controls (shown after files are added) -->
+      <div class="img-controls hidden" id="img-controls">
+        <div class="control-row">
+          <label for="img-format-select" class="control-label">Output format</label>
+          <select id="img-format-select" class="select-input">
+            <option value="original">Keep original</option>
+            <option value="image/jpeg">Convert to JPG</option>
+            <option value="image/webp">Convert to WebP</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="btn-compress" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          Compress All
+        </button>
+      </div>
+
+      <!-- File list -->
+      <div class="file-list" id="img-list"></div>
+
+      <!-- Export bar (shown after at least one file is done) -->
+      <div class="export-bar hidden" id="img-export">
+        <span class="export-summary" id="img-summary"></span>
+        <div class="export-actions">
+          <button class="btn btn-ghost btn-sm" id="btn-clear-img" type="button">Clear</button>
+          <button class="btn btn-accent" id="btn-zip" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download ZIP
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         PDF PANEL
+    ══════════════════════════════════════════ -->
+    <div class="panel" id="panel-pdf" role="tabpanel">
+
+      <!-- Drop zone -->
+      <div class="drop-zone pdf-drop" id="pdf-drop" tabindex="0" role="button" aria-label="Drop a PDF here or click to browse">
+        <svg class="drop-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14,2 14,8 20,8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        <p class="drop-label">Drop a PDF here</p>
+        <p class="drop-sub">or <button class="inline-btn" id="pdf-browse-btn" type="button">browse files</button></p>
+        <p class="drop-types">PDF files only &bull; Scanned/image-based</p>
+        <input type="file" id="pdf-input" accept="application/pdf" hidden aria-hidden="true" />
+      </div>
+
+      <!-- PDF result card -->
+      <div class="pdf-result hidden" id="pdf-result">
+        <div class="result-card">
+          <div class="result-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14,2 14,8 20,8"/>
+            </svg>
+            <span class="result-filename" id="pdf-filename">document.pdf</span>
+          </div>
+
+          <!-- Progress -->
+          <div class="progress-wrap" id="pdf-progress-wrap">
+            <div class="progress-track">
+              <div class="progress-fill" id="pdf-progress-bar" style="width: 0%"></div>
+            </div>
+            <span class="progress-label" id="pdf-progress-label">Preparing…</span>
+          </div>
+
+          <!-- Size comparison (shown when done) -->
+          <div class="size-row hidden" id="pdf-sizes">
+            <div class="size-block">
+              <span class="size-label">Original</span>
+              <span class="size-val" id="pdf-orig-size">—</span>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            <div class="size-block">
+              <span class="size-label">Compressed</span>
+              <span class="size-val accent" id="pdf-comp-size">—</span>
+            </div>
+            <div class="size-block">
+              <span class="size-label">Saved</span>
+              <span class="size-val success" id="pdf-reduction">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions (shown when done) -->
+        <div class="pdf-actions hidden" id="pdf-actions">
+          <button class="btn btn-primary btn-full" id="btn-download-pdf" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Compressed PDF
+          </button>
+          <button class="btn btn-accent btn-full" id="btn-extract-pdf-images" type="button" style="margin-top: 8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Extract Images to ZIP
+          </button>
+          <button class="btn btn-ghost btn-sm btn-full" id="btn-clear-pdf" type="button" style="margin-top: 8px;">Clear</button>
+        </div>
+
+        <!-- Info note -->
+        <div class="info-note">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <p>Text-based PDFs are rasterized — text will not be selectable in output.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         SETTINGS PANEL
+    ══════════════════════════════════════════ -->
+    <div class="panel" id="panel-settings" role="tabpanel">
+      <div class="settings-scroll">
+
+        <div class="settings-group">
+          <h3 class="settings-title">Compression</h3>
+
+          <div class="setting-row">
+            <label for="set-maxdim">Max dimension</label>
+            <div class="range-group">
+              <input type="range" id="set-maxdim" min="400" max="4000" step="100" />
+              <span class="range-val" id="set-maxdim-val">1200 px</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <label for="set-quality">Quality</label>
+            <div class="range-group">
+              <input type="range" id="set-quality" min="10" max="100" step="1" />
+              <span class="range-val" id="set-quality-val">82%</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <label for="set-format">Default format</label>
+            <select id="set-format" class="select-input">
+              <option value="original">Keep original</option>
+              <option value="image/jpeg">Convert to JPG</option>
+              <option value="image/webp">Convert to WebP</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3 class="settings-title">Rename Convention</h3>
+
+          <div class="setting-row">
+            <label for="set-rename-mode">Mode</label>
+            <select id="set-rename-mode" class="select-input">
+              <option value="original">Keep original name</option>
+              <option value="prefix">Add prefix</option>
+              <option value="suffix">Add suffix</option>
+              <option value="sequential">Sequential (image-001…)</option>
+            </select>
+          </div>
+
+          <div class="setting-row hidden" id="row-prefix">
+            <label for="set-prefix">Prefix</label>
+            <input type="text" id="set-prefix" class="text-input" placeholder="e.g. photo_" />
+          </div>
+
+          <div class="setting-row hidden" id="row-suffix">
+            <label for="set-suffix">Suffix</label>
+            <input type="text" id="set-suffix" class="text-input" placeholder="e.g. _compressed" />
+          </div>
+
+          <div class="setting-row hidden" id="row-seqprefix">
+            <label for="set-seqprefix">Seq. prefix</label>
+            <input type="text" id="set-seqprefix" class="text-input" placeholder="image" />
+          </div>
+
+          <div class="setting-row">
+            <label for="set-separator">Replace spaces</label>
+            <select id="set-separator" class="select-input">
+              <option value="none">Keep spaces</option>
+              <option value="-">Dash (–)</option>
+              <option value="_">Underscore (_)</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <label for="set-lowercase">Lowercase names</label>
+            <label class="toggle" for="set-lowercase">
+              <input type="checkbox" id="set-lowercase" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-full" id="btn-save-settings" type="button">
+          Save Settings
+        </button>
+      </div>
+    </div>
+
+  </div><!-- #app -->
+
+  <!-- Third-party libraries (order matters) -->
+  <script src="libs/jszip.min.js"></script>
+  <script src="libs/pdf.min.js"></script>
+  <script src="libs/pdf-lib.min.js"></script>
+  <!-- Main module -->
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
