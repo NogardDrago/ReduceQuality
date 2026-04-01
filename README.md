@@ -31,21 +31,6 @@ Because this extension runs purely on vanilla JavaScript, HTML, and CSS (with lo
 
 *Whenever you make changes to your code, you can click the "Refresh" (circular arrow) icon on the extension's card in the `chrome://extensions/` page to reload it.*
 
-## Publishing to the Chrome Web Store
-
-To release the extension to the Chrome Web Store, follow these steps:
-
-1. **Package the Extension**: Select all the files in this directory (including `manifest.json`, `src/`, `libs/`, etc.) and create a `.zip` archive. Do not zip the parent folder itself; the `manifest.json` must be at the root of the `.zip` file.
-2. **Register as a Chrome Developer**: Go to the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole) and pay the one-time $5 registration fee.
-3. **Upload the Package**: In the dashboard, click "New Item" and upload your `.zip` file.
-4. **Provide Store Details**: You will need to provide:
-   - A clear description (you can use the one above).
-   - Screenshots of the extension in action (1280x800 is recommended).
-   - A promotional tile image (440x280).
-5. **Submit for Review**: 
-   - Because your extension requests the `"storage"` permission, you must provide a justification in the Privacy tab (e.g., "Used to save user preferences for compression quality").
-   - You will also need to provide a link to a basic Privacy Policy stating that all processing is done locally and no user data is collected.
-
 ## Technologies Used
 
 - Manifest V3 architecture
