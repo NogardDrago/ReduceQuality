@@ -16,8 +16,8 @@ const imageResults = [];
 const itemEls      = new Map(); // id -> DOM element
 
 // pdf state
-let pdfFile   = null;
-let pdfResult = null; // { blob, originalSize, compressedSize }
+const pdfResults = [];
+const pdfItemEls = new Map(); // id -> DOM element
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -278,110 +278,230 @@ function initPdfZone() {
   });
   drop.addEventListener('click', () => input.click());
   drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') input.click(); });
-  input.addEventListener('change', () => {
-    if (input.files[0]) startPdfProcessing(input.files[0]);
-  });
+  input.addEventListener('change', () => addPdfFiles(Array.from(input.files)));
 
   drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
   drop.addEventListener('dragleave', e => { if (!drop.contains(e.relatedTarget)) drop.classList.remove('drag-over'); });
   drop.addEventListener('drop', e => {
     e.preventDefault();
     drop.classList.remove('drag-over');
-    const f = e.dataTransfer.files[0];
-    if (f && f.type === 'application/pdf') startPdfProcessing(f);
-    else showToast('Please drop a PDF file.', 'error');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
+    if (files.length) addPdfFiles(files);
+    else showToast('No valid PDF files found.', 'error');
   });
 
-  document.getElementById('btn-download-pdf').addEventListener('click', downloadPdf);
+  document.getElementById('btn-compress-pdfs').addEventListener('click', compressAllPdfs);
+  document.getElementById('btn-clear-pdf').addEventListener('click', clearPdfs);
+  document.getElementById('btn-download-pdfs').addEventListener('click', downloadAllPdfsZip);
   document.getElementById('btn-extract-pdf-images').addEventListener('click', extractPdfImages);
-  document.getElementById('btn-clear-pdf').addEventListener('click', clearPdf);
 }
 
-async function startPdfProcessing(file) {
-  pdfFile   = file;
-  pdfResult = null;
+function addPdfFiles(files) {
+  const valid = files.filter(f => {
+    if (f.type !== 'application/pdf') { showToast(`Skipped "${f.name}" — unsupported type.`, 'warning'); return false; }
+    return true;
+  });
+  if (!valid.length) return;
+
+  valid.forEach(file => {
+    const { base, ext } = splitFilename(file.name);
+    const id = `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    pdfResults.push({ id, file, state: 'queued', originalName: base, origExt: ext,
+      origSize: file.size, blob: null, compressedSize: null, jpegBlobs: null, error: null, progress: 0 });
+    renderOrUpdatePdfItem(pdfResults.at(-1));
+  });
 
   document.getElementById('pdf-drop').classList.add('hidden');
-  document.getElementById('pdf-filename').textContent = file.name;
-  document.getElementById('pdf-progress-bar').style.width = '0%';
-  document.getElementById('pdf-progress-label').textContent = 'Preparing…';
-  document.getElementById('pdf-sizes').classList.add('hidden');
-  document.getElementById('pdf-actions').classList.add('hidden');
-  showElement('pdf-result', false);
-  document.getElementById('pdf-result').classList.remove('hidden');
+  showElement('pdf-controls');
+  syncPdfExportBar();
+}
 
-  try {
-    const result = await processPdf(file, settings, (cur, total) => {
-      const pct = Math.round((cur / total) * 100);
-      document.getElementById('pdf-progress-bar').style.width = `${pct}%`;
-      document.getElementById('pdf-progress-label').textContent = `Page ${cur} of ${total}`;
-    });
-
-    pdfResult = result;
-
-    document.getElementById('pdf-progress-bar').style.width = '100%';
-    document.getElementById('pdf-progress-label').textContent = 'Done!';
-    document.getElementById('pdf-orig-size').textContent  = formatBytes(result.originalSize);
-    document.getElementById('pdf-comp-size').textContent  = formatBytes(result.compressedSize);
-    document.getElementById('pdf-reduction').textContent  = formatReduction(result.originalSize, result.compressedSize);
-    document.getElementById('pdf-sizes').classList.remove('hidden');
-    document.getElementById('pdf-actions').classList.remove('hidden');
-
-    showToast('PDF compressed successfully!', 'success');
-  } catch (err) {
-    document.getElementById('pdf-progress-label').textContent = `Error: ${err.message}`;
-    document.getElementById('pdf-progress-bar').style.background = 'var(--error)';
-    showToast('PDF processing failed: ' + err.message, 'error');
+function renderOrUpdatePdfItem(result) {
+  if (pdfItemEls.has(result.id)) {
+    updatePdfItemEl(pdfItemEls.get(result.id), result);
+  } else {
+    const el = document.createElement('div');
+    el.className = 'file-item';
+    el.id = `item-${result.id}`;
+    updatePdfItemEl(el, result);
+    pdfItemEls.set(result.id, el);
+    document.getElementById('pdf-list').appendChild(el);
   }
 }
 
-function downloadPdf() {
-  if (!pdfResult) return;
-  const name = pdfFile ? pdfFile.name.replace(/\.pdf$/i, '-compressed.pdf') : 'compressed.pdf';
-  triggerDownload(pdfResult.blob, name);
+function updatePdfItemEl(el, result) {
+  const displayName = `${result.originalName}.${result.origExt}`;
+  const iconHtml = `<div class="file-thumb-placeholder"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>`;
+
+  let sizeHtml = `<span>${formatBytes(result.origSize)}</span>`;
+  if (result.state === 'done') {
+    const saved = formatReduction(result.origSize, result.compressedSize);
+    sizeHtml = `<span>${formatBytes(result.origSize)}</span><span class="arrow">→</span><span class="new-size">${formatBytes(result.compressedSize)}</span><span class="reduction">${saved}</span>`;
+  }
+  if (result.state === 'error') {
+    sizeHtml = `<span style="color:var(--error);font-size:10.5px">${result.error}</span>`;
+  }
+
+  let statusHtml = '';
+  if (result.state === 'queued') statusHtml = `<span class="badge badge-queued">Queued</span>`;
+  if (result.state === 'processing') statusHtml = `<div class="spinner"></div> <span style="font-size:10px;margin-left:4px;">${result.progress}%</span>`;
+  if (result.state === 'done') {
+    statusHtml = `
+      <button class="btn-icon" data-id="${result.id}" title="Download" aria-label="Download PDF">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>`;
+  }
+  if (result.state === 'error') statusHtml = `<span class="badge badge-error">Error</span>`;
+
+  el.innerHTML = `
+    ${iconHtml}
+    <div class="file-info">
+      <div class="file-name" title="${displayName}">${displayName}</div>
+      <div class="file-sizes">${sizeHtml}</div>
+    </div>
+    <div class="file-status">${statusHtml}</div>
+  `;
+
+  const dlBtn = el.querySelector('.btn-icon[data-id]');
+  if (dlBtn) {
+    dlBtn.addEventListener('click', e => { e.stopPropagation(); downloadSinglePdf(result.id); });
+  }
+}
+
+async function compressAllPdfs() {
+  const queued = pdfResults.filter(r => r.state === 'queued');
+  if (!queued.length) { showToast('Nothing to compress.', 'warning'); return; }
+
+  document.getElementById('btn-compress-pdfs').disabled = true;
+
+  let doneCount = 0;
+  for (const result of queued) {
+    result.state = 'processing';
+    result.progress = 0;
+    renderOrUpdatePdfItem(result);
+
+    try {
+      const out = await processPdf(result.file, settings, (cur, total) => {
+        result.progress = Math.round((cur / total) * 100);
+        renderOrUpdatePdfItem(result);
+      });
+      result.state          = 'done';
+      result.blob           = out.blob;
+      result.compressedSize = out.compressedSize;
+      result.jpegBlobs      = out.jpegBlobs;
+      doneCount++;
+    } catch (err) {
+      result.state = 'error';
+      result.error = err.message || 'Processing failed';
+    }
+
+    renderOrUpdatePdfItem(result);
+  }
+
+  document.getElementById('btn-compress-pdfs').disabled = false;
+  syncPdfExportBar();
+  showToast(`${doneCount} PDF${doneCount !== 1 ? 's' : ''} compressed.`, 'success');
+}
+
+function syncPdfExportBar() {
+  const done = pdfResults.filter(r => r.state === 'done');
+  if (!done.length) { hideElement('pdf-export'); return; }
+
+  const totalOrig = done.reduce((s, r) => s + r.origSize, 0);
+  const totalComp = done.reduce((s, r) => s + r.compressedSize, 0);
+  const saved = formatReduction(totalOrig, totalComp);
+  document.getElementById('pdf-summary').textContent =
+    `${done.length} PDF${done.length !== 1 ? 's' : ''} · ${formatBytes(totalOrig)} → ${formatBytes(totalComp)} (${saved})`;
+
+  showElement('pdf-export');
+}
+
+function downloadSinglePdf(id) {
+  const result = pdfResults.find(r => r.id === id);
+  if (!result || !result.blob) return;
+  const filename = `${result.originalName}-compressed.${result.origExt}`;
+  triggerDownload(result.blob, filename);
+}
+
+async function downloadAllPdfsZip() {
+  const done = pdfResults.filter(r => r.state === 'done');
+  if (!done.length) return;
+
+  const btn = document.getElementById('btn-download-pdfs');
+  btn.disabled = true;
+
+  try {
+    const files = done.map(r => ({
+      filename: `${r.originalName}-compressed.${r.origExt}`,
+      blob: r.blob,
+    }));
+    const zipBlob = await createZip(files);
+    triggerDownload(zipBlob, 'compressed-pdfs.zip');
+    showToast('ZIP downloaded!', 'success');
+  } catch (err) {
+    showToast('ZIP creation failed: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function extractPdfImages() {
-  if (!pdfResult || !pdfResult.jpegBlobs || !pdfResult.jpegBlobs.length) return;
-  
+  const done = pdfResults.filter(r => r.state === 'done');
+  if (!done.length) return;
+
+  const mode = document.getElementById('pdf-extract-mode').value;
   const btn = document.getElementById('btn-extract-pdf-images');
-  const originalHtml = btn.innerHTML;
   btn.disabled = true;
   btn.textContent = 'Zipping…';
 
   try {
-    const baseName = pdfFile ? pdfFile.name.replace(/\.pdf$/i, '') : 'images';
-    const files = pdfResult.jpegBlobs.map((blob, idx) => ({
-      filename: `${baseName}-page-${String(idx + 1).padStart(3, '0')}.jpg`,
-      blob: blob,
-    }));
-    
-    const zipBlob = await createZip(files);
-    triggerDownload(zipBlob, `${baseName}-images.zip`);
-    showToast('Images extracted and zipped!', 'success');
+    if (mode === 'separate') {
+      for (const r of done) {
+        if (!r.jpegBlobs || !r.jpegBlobs.length) continue;
+        const files = r.jpegBlobs.map((blob, idx) => ({
+          filename: `page-${String(idx + 1).padStart(3, '0')}.jpg`,
+          blob: blob,
+        }));
+        const zipBlob = await createZip(files);
+        triggerDownload(zipBlob, `${r.originalName}-images.zip`);
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+      showToast('Extraction complete!', 'success');
+    } else {
+      const allFiles = [];
+      done.forEach(r => {
+        if (!r.jpegBlobs || !r.jpegBlobs.length) return;
+        r.jpegBlobs.forEach((blob, idx) => {
+          let filename;
+          if (mode === 'single-subfolder') {
+            filename = `${r.originalName}/page-${String(idx + 1).padStart(3, '0')}.jpg`;
+          } else {
+            filename = `${r.originalName}-page-${String(idx + 1).padStart(3, '0')}.jpg`;
+          }
+          allFiles.push({ filename, blob });
+        });
+      });
+      const zipBlob = await createZip(allFiles);
+      triggerDownload(zipBlob, 'extracted-pdf-images.zip');
+      showToast('Extraction ZIP downloaded!', 'success');
+    }
   } catch (err) {
-    showToast('ZIP extraction failed: ' + err.message, 'error');
+    showToast('Extraction failed: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = originalHtml;
+    btn.textContent = 'Extract';
   }
 }
 
-function clearPdf() {
-  pdfFile = pdfResult = null;
-  document.getElementById('pdf-result').classList.add('hidden');
-  document.getElementById('pdf-drop').classList.remove('hidden');
+function clearPdfs() {
+  pdfResults.length = 0;
+  pdfItemEls.clear();
+  document.getElementById('pdf-list').innerHTML = '';
+  hideElement('pdf-controls');
+  hideElement('pdf-export');
+  showElement('pdf-drop', true);
   document.getElementById('pdf-input').value = '';
-  document.getElementById('pdf-progress-bar').style.background = '';
-  
-  const extractBtn = document.getElementById('btn-extract-pdf-images');
-  if (extractBtn) {
-    extractBtn.disabled = false;
-    extractBtn.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Extract Images to ZIP
-    `;
-  }
+  document.getElementById('pdf-drop').classList.remove('hidden');
 }
 
 // ─── Settings form ────────────────────────────────────────────────────────────
@@ -397,6 +517,9 @@ function initSettingsForm() {
     document.getElementById('set-quality-val').textContent = `${rangeQuality.value}%`;
   });
 
+  // Resize mode — show/hide sub-fields
+  document.getElementById('set-resize-mode').addEventListener('change', syncResizeRows);
+
   // Rename mode — show/hide sub-fields
   document.getElementById('set-rename-mode').addEventListener('change', syncRenameRows);
 
@@ -409,8 +532,12 @@ function initSettingsForm() {
 }
 
 function applySettingsToUI() {
+  document.getElementById('set-resize-mode').value = settings.resizeMode;
   document.getElementById('set-maxdim').value    = settings.maxDim;
   document.getElementById('set-maxdim-val').textContent = `${settings.maxDim} px`;
+  document.getElementById('set-exact-w').value   = settings.exactWidth;
+  document.getElementById('set-exact-h').value   = settings.exactHeight;
+  document.getElementById('set-exact-fit').value = settings.exactFit;
 
   document.getElementById('set-quality').value   = Math.round(settings.quality * 100);
   document.getElementById('set-quality-val').textContent = `${Math.round(settings.quality * 100)}%`;
@@ -424,6 +551,14 @@ function applySettingsToUI() {
   document.getElementById('set-separator').value    = settings.separator;
   document.getElementById('set-lowercase').checked  = settings.lowercase;
   syncRenameRows();
+  syncResizeRows();
+}
+
+function syncResizeRows() {
+  const mode = document.getElementById('set-resize-mode').value;
+  document.getElementById('row-maxdim').classList.toggle('hidden', mode !== 'maxDim');
+  document.getElementById('row-exactdim').classList.toggle('hidden', mode !== 'exact');
+  document.getElementById('row-exactfit').classList.toggle('hidden', mode !== 'exact');
 }
 
 function syncRenameRows() {
@@ -435,7 +570,11 @@ function syncRenameRows() {
 
 function readSettingsFromForm() {
   return {
+    resizeMode:   document.getElementById('set-resize-mode').value,
     maxDim:       parseInt(document.getElementById('set-maxdim').value, 10),
+    exactWidth:   parseInt(document.getElementById('set-exact-w').value, 10) || 1920,
+    exactHeight:  parseInt(document.getElementById('set-exact-h').value, 10) || 1080,
+    exactFit:     document.getElementById('set-exact-fit').value,
     quality:      parseInt(document.getElementById('set-quality').value, 10) / 100,
     outputFormat: document.getElementById('set-format').value,
     renameMode:   document.getElementById('set-rename-mode').value,

@@ -36,11 +36,39 @@ export async function processImage(file, settings) {
   const origWidth = bitmap.width;
   const origHeight = bitmap.height;
 
-  // Compute output dimensions (only downscale, never upscale)
-  const longest = Math.max(origWidth, origHeight);
-  const scale = longest > maxDim ? maxDim / longest : 1;
-  const outWidth  = Math.round(origWidth  * scale);
-  const outHeight = Math.round(origHeight * scale);
+  let outWidth, outHeight;
+  let drawX = 0, drawY = 0, drawW = 0, drawH = 0;
+
+  if (settings.resizeMode === 'exact' && settings.exactWidth > 0 && settings.exactHeight > 0) {
+    outWidth = settings.exactWidth;
+    outHeight = settings.exactHeight;
+
+    const scaleX = outWidth / origWidth;
+    const scaleY = outHeight / origHeight;
+
+    if (settings.exactFit === 'stretch') {
+      drawX = 0; drawY = 0; drawW = outWidth; drawH = outHeight;
+    } else if (settings.exactFit === 'crop') {
+      const scale = Math.max(scaleX, scaleY);
+      drawW = Math.round(origWidth * scale);
+      drawH = Math.round(origHeight * scale);
+      drawX = Math.round((outWidth - drawW) / 2);
+      drawY = Math.round((outHeight - drawH) / 2);
+    } else { // box
+      const scale = Math.min(scaleX, scaleY);
+      drawW = Math.round(origWidth * scale);
+      drawH = Math.round(origHeight * scale);
+      drawX = Math.round((outWidth - drawW) / 2);
+      drawY = Math.round((outHeight - drawH) / 2);
+    }
+  } else {
+    // defaults to maxDim behavior
+    const longest = Math.max(origWidth, origHeight);
+    const scale = longest > maxDim ? maxDim / longest : 1;
+    outWidth  = Math.max(1, Math.round(origWidth  * scale));
+    outHeight = Math.max(1, Math.round(origHeight * scale));
+    drawX = 0; drawY = 0; drawW = outWidth; drawH = outHeight;
+  }
 
   // Draw to OffscreenCanvas
   const canvas = new OffscreenCanvas(outWidth, outHeight);
@@ -52,7 +80,7 @@ export async function processImage(file, settings) {
     ctx.fillRect(0, 0, outWidth, outHeight);
   }
 
-  ctx.drawImage(bitmap, 0, 0, outWidth, outHeight);
+  ctx.drawImage(bitmap, 0, 0, origWidth, origHeight, drawX, drawY, drawW, drawH);
   bitmap.close(); // free GPU memory
 
   // Encode
